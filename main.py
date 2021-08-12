@@ -24,7 +24,8 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def connect_gdrive():
     """
-    Connects to Google Drive API and returns the service
+    Connects to Google Drive API and returns the service. 
+    Adapted from https://developers.google.com/drive/api/v3/quickstart/python
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -55,6 +56,10 @@ def make_test_file_structure():
 
 
 def make_tarfile(output_filename, source_dir):
+    """
+    Takes a directory and puts it in a tar package.
+    Source: https://stackoverflow.com/a/17081026
+    """
     with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(source_dir, arcname=os.path.basename(source_dir))
 
@@ -64,9 +69,9 @@ def file_package():
     Packages up the file or throws an error
     """
     try:
-        if not os.path.isdir(FILE_PATH):
+        if not os.path.isdir(FILE_PATH): # if the provided dir isn't a dir, abort
             raise FileNotFoundError
-        today = datetime.datetime.today()
+        today = datetime.datetime.today() # formats the backup filename
         file_name = "Home Assistant {0}.tar.gz".format(today.strftime("%d-%m-%Y %H %M"))
         make_tarfile(file_name, FILE_PATH)
         return file_name
@@ -79,18 +84,19 @@ def google_drive_folder(service):
     """
     Creates or retrieves the specified Google Drive folder
     """
+    # Checks to see if the folder already exists by searching
     query_string = "mimeType='application/vnd.google-apps.folder' and name = '{0}'".format(GDRIVE_FOLDER)
     response = service.files().list(q=query_string,
                                           spaces='drive',
                                           fields='files(id, name)').execute()
     
-    num_of_folders = len(response.get('files'))
-    if num_of_folders > 1:
+    num_of_folders = len(response.get('files')) # checks how many folders are returned
+    if num_of_folders > 1: # multiple folders of the same name, so abort and tell user to delete
         # raises exception to delete one
         print("You have multiple folders in Google Drive called '{0}'. Please delete one and empty it from the Trash".format(GDRIVE_FOLDER))
         raise
 
-    if num_of_folders == 0:
+    if num_of_folders == 0: # doesn't exist, so create
         # creates a folder
         file_metadata = {
             'name': GDRIVE_FOLDER,
@@ -100,7 +106,7 @@ def google_drive_folder(service):
                                             fields='id').execute()
         return file.get('id')
 
-    if num_of_folders == 1:
+    if num_of_folders == 1: # already exists, so use it
         file = response.get('files')
         return file[0].get('id')
 
@@ -117,7 +123,7 @@ def upload(service, folder_id):
     file = service.files().create(body=file_metadata,
                                         media_body=media,
                                         fields='id').execute()
-    print('File ID: %s' % file.get('id'))
+    return file.get('id')
 
 
 
