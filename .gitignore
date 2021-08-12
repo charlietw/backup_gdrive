@@ -1,0 +1,6 @@
+# All .tar.gz files
+*.tar.gz
+
+# GDrive credentials
+credentials.json
+token.json
