@@ -4,3 +4,11 @@
 # GDrive credentials
 credentials.json
 token.json
+
+# testing folder
+test_folder/
+
+# coverage report
+.coverage
+__pycache__/
+htmlcov/
