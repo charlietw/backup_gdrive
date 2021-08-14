@@ -2,6 +2,9 @@
 import os
 import os.path
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 # for Google Drive authentication
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -16,12 +19,28 @@ import datetime
 from utils import *
 
 
-
-FILE_PATH = "test_folder"
-GDRIVE_FOLDER = "Home Assistant Backups"
-
-# If modifying these scopes, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/drive']
+def set_envvars():
+    """
+    Asserts that all required env vars are present and raises error if not
+    Sets config from envvars if all present
+    """
+    try:
+        if not "FILE_PATH" in os.environ:
+            logging.error("Please set a FILE_PATH env var")
+            raise FileNotFoundError
+        if not "GDRIVE_FOLDER" in os.environ:
+            logging.error("Please set a GDRIVE_FOLDER env var")
+            raise FileNotFoundError
+        if not "BACKUPS_TO_KEEP" in os.environ:
+            logging.error("Please set a BACKUPS_TO_KEEP env var")
+            raise FileNotFoundError
+        file_path = os.environ['FILE_PATH']
+        gdrive_folder = os.environ['GDRIVE_FOLDER']
+        backups_to_keep = int(os.environ['BACKUPS_TO_KEEP'])
+        logging.info("All env vars found")
+        return file_path, gdrive_folder, backups_to_keep
+    except:
+        raise
 
 
 
@@ -30,6 +49,8 @@ def connect_gdrive():
     Connects to Google Drive API and returns the service. 
     Adapted from https://developers.google.com/drive/api/v3/quickstart/python
     """
+    # If modifying these scopes, delete the file token.json.
+    SCOPES = ['https://www.googleapis.com/auth/drive']
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -74,7 +95,7 @@ def file_package(file_path):
         make_tarfile(file_name, file_path)
         return file_name
     except FileNotFoundError:
-        print("Your FILE_PATH variable is incorrect. Is {0} definitely a directory?".format(file_path))
+        logging.error("Your FILE_PATH variable is incorrect. Is {0} definitely a directory?".format(file_path))
         raise
 
 
@@ -92,7 +113,7 @@ def google_drive_folder(service, gdrive_folder):
     num_of_folders = len(response.get('files')) # checks how many folders are returned
     if num_of_folders > 1: # multiple folders of the same name, so abort and tell user to delete
         # raises exception to delete one
-        print("You have multiple folders in Google Drive called '{0}'. Please delete one and empty it from the Trash".format(gdrive_folder))
+        logging.error("You have multiple folders in Google Drive called '{0}'. Please delete one and empty it from the Trash".format(gdrive_folder))
         raise Exception
 
     if num_of_folders == 0: # doesn't exist, so create
@@ -110,7 +131,7 @@ def google_drive_folder(service, gdrive_folder):
         return file[0].get('id')
 
 
-def google_drive_file_age(service, file):
+def google_drive_file_age(file):
     """
     Takes a file from GDrive and appends how old it is in days
     """
@@ -119,14 +140,6 @@ def google_drive_file_age(service, file):
     delta = now - created_on
     file['file_age_days'] = delta.days
     return file['file_age_days']
-
-
-def google_drive_delete_query(service, file):
-    """
-    Determines whether or not a file should be deleted according to config
-    and returns a boolean
-    """
-    pass
 
 
 
@@ -151,7 +164,7 @@ def google_drive_folder_children(service, folder_id):
             if not page_token:
                 break
         except Exception as E:
-            print('An error occurred: %s' % E)
+            logging.error('An error occurred: %s' % E)
             break
 
     return children.get('files') # returns just the JSON
@@ -163,22 +176,36 @@ def append_file_age(files):
     """
     files.sort(key = lambda json: json['createdTime'], reverse=False) # sorts so that oldest are first
     for child in files:
-        google_drive_file_age(service, child) # appends age in days
+        google_drive_file_age(child) # appends age in days
     return files
 
 
-def number_of_files(files):
+def google_drive_delete(service, files, backups_to_keep):
     """
-    Counts the number of files
+    Determines whether or not a file should be deleted according to config
+    and returns a boolean
     """
-    return len(files)
+    number_of_files = len(files)
+    # print("number of files to start = {0}".format(number_of_files))
+    if number_of_files <= backups_to_keep: # not enough files yet, so exit
+        return 0
+    else:
+        index = 0
+        while number_of_files > backups_to_keep:
+            file_id = files[index]['id'] # gets the file to be deleted
+            service.files().delete(fileId=file_id).execute() # deletes the file
+            logging.info("Deleted file {0}".format(file_id))
+            number_of_files -= 1 # decrements the count
+            index += 1
+            # print("number of files = {0}, number deleted = {1}".format(number_of_files, index))
+        return index
 
 
-def upload(service, folder_id):
+
+def upload(service, file_name, folder_id):
     """
     Uploads a packaged file to the specificed GDrive folder, returns the file_id
     """
-    file_name = file_package(FILE_PATH)
     
     file_metadata = {
         'name': file_name,
@@ -188,14 +215,27 @@ def upload(service, folder_id):
     file = service.files().create(body=file_metadata,
                                         media_body=media,
                                         fields='id').execute()
+    logging.info("Successfully created file {0}".format(file.get('id')))
+
     return file.get('id')
 
 
+def run(file_path, gdrive_folder, backups_to_keep):
+    logging.info(
+        "Running backup from '{0}' on the local machine to '{1}' in Google Drive, keeping the most recent {2} backups.".format(
+            file_path, gdrive_folder, backups_to_keep))
+    service = connect_gdrive() # connect to Google
+    folder_id = google_drive_folder(service, gdrive_folder) # gets the folder
+    file_name = file_package(file_path) # zips the file
+    upload(service, file_name, folder_id) # uploads the file
+    files = google_drive_folder_children(service, folder_id) # gets the files
+    files = append_file_age(files) # adds the file age
+    files_deleted = google_drive_delete(service, files, backups_to_keep) # deletes the files
+    os.remove(file_name)
+    logging.info("Backup successful. {0} files deleted.".format(files_deleted))
+    return files_deleted
+
 
 if __name__ == '__main__':
-    make_test_file_structure(FILE_PATH)
-    service = connect_gdrive()
-    folder_id = google_drive_folder(service, GDRIVE_FOLDER)
-    files = google_drive_folder_children(service, folder_id)
-    files = append_file_age(files) # adds the file age
-    # upload(service, folder_id)
+    file_path, gdrive_folder, backups_to_keep = set_envvars()
+    run(file_path, gdrive_folder, backups_to_keep)
