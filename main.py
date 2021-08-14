@@ -13,12 +13,12 @@ from apiclient.http import MediaFileUpload
 import tarfile
 import datetime
 
-import utils
+from utils import *
 
 
 
 FILE_PATH = "test_folder"
-GDRIVE_FOLDER = "Home Assistant Backupss"
+GDRIVE_FOLDER = "Home Assistant Backups"
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -84,9 +84,10 @@ def google_drive_folder(service, gdrive_folder):
     """
     # Checks to see if the folder already exists by searching
     query_string = "mimeType='application/vnd.google-apps.folder' and name = '{0}'".format(gdrive_folder)
-    response = service.files().list(q=query_string,
-                                          spaces='drive',
-                                          fields='files(id, name)').execute()
+    response = service.files().list(
+        q=query_string,
+        spaces='drive',
+        fields='files(id, name)').execute()
     
     num_of_folders = len(response.get('files')) # checks how many folders are returned
     if num_of_folders > 1: # multiple folders of the same name, so abort and tell user to delete
@@ -109,8 +110,74 @@ def google_drive_folder(service, gdrive_folder):
         return file[0].get('id')
 
 
+def google_drive_file_age(service, file):
+    """
+    Takes a file from GDrive and appends how old it is in days
+    """
+    created_on = datetime.datetime.strptime(file['createdTime'], '%Y-%m-%dT%H:%M:%S.%fZ')
+    now = datetime.datetime.today()
+    delta = now - created_on
+    file['file_age_days'] = delta.days
+    return file['file_age_days']
+
+
+def google_drive_delete_query(service, file):
+    """
+    Determines whether or not a file should be deleted according to config
+    and returns a boolean
+    """
+    pass
+
+
+
+def google_drive_folder_children(service, folder_id):
+    """
+    Gets all files in a folder.
+    Adapted from https://developers.google.com/drive/api/v2/reference/children/list
+    """
+
+    page_token = None
+    query_string = "parents in '{0}'".format(folder_id)
+    while True:
+        try:
+            param = {}
+            if page_token:
+                param['pageToken'] = page_token
+            children = service.files().list(
+                q=query_string,
+                spaces='drive',
+                fields='files(id, name, createdTime)').execute()
+            page_token = children.get('nextPageToken')
+            if not page_token:
+                break
+        except Exception as E:
+            print('An error occurred: %s' % E)
+            break
+
+    return children.get('files') # returns just the JSON
+
+
+def append_file_age(files):
+    """
+    Appends the file age to a JSON of GDrive files and sorts them
+    """
+    files.sort(key = lambda json: json['createdTime'], reverse=False) # sorts so that oldest are first
+    for child in files:
+        google_drive_file_age(service, child) # appends age in days
+    return files
+
+
+def number_of_files(files):
+    """
+    Counts the number of files
+    """
+    return len(files)
+
 
 def upload(service, folder_id):
+    """
+    Uploads a packaged file to the specificed GDrive folder, returns the file_id
+    """
     file_name = file_package(FILE_PATH)
     
     file_metadata = {
@@ -126,6 +193,9 @@ def upload(service, folder_id):
 
 
 if __name__ == '__main__':
+    make_test_file_structure(FILE_PATH)
     service = connect_gdrive()
     folder_id = google_drive_folder(service, GDRIVE_FOLDER)
-    upload(service, folder_id)
+    files = google_drive_folder_children(service, folder_id)
+    files = append_file_age(files) # adds the file age
+    # upload(service, folder_id)
