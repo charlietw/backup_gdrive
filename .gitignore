@@ -2,9 +2,9 @@
 *.tar.gz
 
 # GDrive credentials
-app/credentials.json
+app/credentials_service_account.json
 app/token.json
-app/credentials_old.json
+app/credentials_token.json
 
 # testing folder
 test_folder/
