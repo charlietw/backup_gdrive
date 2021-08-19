@@ -57,23 +57,23 @@ def connect_gdrive(method):
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if os.path.exists('creds/token.json'):
+            creds = Credentials.from_authorized_user_file('creds/token.json', SCOPES)
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials_token.json', SCOPES)
+                    'creds/credentials_token.json', SCOPES)
                 creds = flow.run_console()
             # Save the credentials for the next run
-            with open('token.json', 'w') as token:
+            with open('creds/token.json', 'w') as token:
                 token.write(creds.to_json())
 
     elif method == "service_account":
         credentials = service_account.Credentials.from_service_account_file(
-            'credentials_service_account.json')
+            'creds/credentials_service_account.json')
         creds = credentials.with_scopes(SCOPES)
 
     service = build('drive', 'v3', credentials=creds)
