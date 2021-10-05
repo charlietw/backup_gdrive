@@ -40,7 +40,7 @@ You are also required to allow programmatic access to your Google Drive. See ins
 
 For example:
 
-```docker run  -e FILE_PATH=<<your directory>> -e GDRIVE_FOLDER=<<your gdrive folder>> -e BACKUPS_TO_KEEP=<number of backups you want>> -v <<volume>>:<<path to credentials directory>> --name gdrivebackup hassbackup```
+```docker run -e FILE_PATH=/gdrivebackup -e GDRIVE_FOLDER=Home_Assistant_Backups -e BACKUPS_TO_KEEP=5 -e TZ=Europe/London -v gdrivebackup_creds:/home/charlie/docker/homeassistant-backup/app/creds -v /home/charlie/docker/homeassistant-config:/gdrivebackup --name gdrivebackup hassbackup:latest```
 
 Add ```-t -i``` after ```docker run``` the first time you run it inspect the shell and follow the Oauth flow.
 
