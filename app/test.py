@@ -26,7 +26,7 @@ class TestConnectGDrive(unittest.TestCase):
         Test that it can connect to GDrive
         (no assertions can be made)
         """
-        service = connect_gdrive()
+        service = connect_gdrive("token")
 
 
 class TestFolderFunctions(unittest.TestCase):
@@ -82,7 +82,7 @@ class TestGoogleFolderFunctions(unittest.TestCase):
 
     def setUp(self):
         self.gdrive_folder = "test_gdrive"
-        self.service = connect_gdrive()
+        self.service = connect_gdrive("token")
 
     def tearDown(self):
         remove_google_drive_folder(self.service, self.folder_id)
@@ -116,7 +116,7 @@ class TestGoogleFolderFunctions(unittest.TestCase):
 class TestRun(unittest.TestCase):
 
     def setUp(self):
-        self.service = connect_gdrive()
+        self.service = connect_gdrive("token")
         make_test_file_structure(FILE_PATH)
         self.folder_id = google_drive_folder(self.service, GDRIVE_FOLDER) # creates folder
 
