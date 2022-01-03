@@ -15,11 +15,12 @@ Once it is set up and configured correctly, it is simply a matter of configuring
 
 #### Configuration
 
-You are required to configure three environmental variables to run this program. If you prefer to run it in Docker, you can set it when creating the Container.
+You are required to configure four environmental variables to run this program. If you prefer to run it in Docker, you can set it when creating the Container.
 
 1. FILE_PATH - the directory in which the files you want to backup are located. It will tar the files for ease of use. e.g.: /home/test_folder
 2. GDRIVE_FOLDER - this must be specified, but it does not have to be an existing folder in your Google Drive. If it does not already exist, then it will be created. If there are multiple folders with the same name (including in the trash), you must delete one. e.g. gdrive_backup_test
 3. BACKUPS_TO_KEEP - an integer which will specify how many backups to keep. e.g. 5
+4. EMAIL_TO_SHARE - an email address to share the files with in case you want to use a service account
 
 
 
@@ -56,6 +57,7 @@ services:
       - FILE_PATH=test_folder
       - GDRIVE_FOLDER=test_gdrive_folder
       - BACKUPS_TO_KEEP=2
+      - EMAIL_TO_SHARE=test@test.com
     volumes:
       - <<your volume>>:<<path to credentials directory>>
     image: gdrivebackup

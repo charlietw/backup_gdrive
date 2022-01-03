@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 
 
 from apiclient.http import MediaFileUpload
@@ -36,11 +37,15 @@ def set_envvars():
         if not "BACKUPS_TO_KEEP" in os.environ:
             logging.error("Please set a BACKUPS_TO_KEEP env var")
             raise FileNotFoundError
+        if not "EMAIL_TO_SHARE" in os.environ:
+            logging.error("Please set a EMAIL_TO_SHARE env var")
+            raise FileNotFoundError
         file_path = os.environ['FILE_PATH']
         gdrive_folder = os.environ['GDRIVE_FOLDER']
         backups_to_keep = int(os.environ['BACKUPS_TO_KEEP'])
+        email_to_share = os.environ['EMAIL_TO_SHARE']
         logging.info("All env vars found")
-        return file_path, gdrive_folder, backups_to_keep
+        return file_path, gdrive_folder, backups_to_keep, email_to_share
     except:
         raise
 
@@ -136,9 +141,22 @@ def google_drive_folder(service, gdrive_folder):
                                             fields='id').execute()
         return file.get('id')
 
-    if num_of_folders == 1: # already exists, so use it
+    if num_of_folders == 1: # already exists, so use it, and share in case of service account
+
         file = response.get('files')
-        return file[0].get('id')
+        file_id = file[0].get('id')
+        user_permission = {
+            'type': 'user',
+            'role': 'writer',
+            'emailAddress': '{0}'.format(email_to_share)
+        }
+        service.permissions().create(
+            fileId=file_id,
+            body=user_permission,
+            fields='id',
+        ).execute()
+
+        return file_id
 
 
 def google_drive_file_age(file):
@@ -230,11 +248,11 @@ def upload(service, file_name, folder_id):
     return file.get('id')
 
 
-def run(file_path, gdrive_folder, backups_to_keep):
+def run(file_path, gdrive_folder, backups_to_keep, email_to_share):
     logging.info(
         "Running backup from '{0}' on the local machine to '{1}' in Google Drive, keeping the most recent {2} backups.".format(
             file_path, gdrive_folder, backups_to_keep))
-    service = connect_gdrive("token") # connect to Google
+    service = connect_gdrive("service_account") # connect to Google
     folder_id = google_drive_folder(service, gdrive_folder) # gets the folder
     file_name = file_package(file_path) # zips the file
     upload(service, file_name, folder_id) # uploads the file
@@ -247,5 +265,5 @@ def run(file_path, gdrive_folder, backups_to_keep):
 
 
 if __name__ == '__main__':
-    file_path, gdrive_folder, backups_to_keep = set_envvars()
-    run(file_path, gdrive_folder, backups_to_keep)
+    file_path, gdrive_folder, backups_to_keep, email_to_share = set_envvars()
+    run(file_path, gdrive_folder, backups_to_keep, email_to_share)
