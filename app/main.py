@@ -154,6 +154,7 @@ def google_drive_folder(service, gdrive_folder):
             fileId=file_id,
             body=user_permission,
             fields='id',
+            sendNotificationEmail=False
         ).execute()
 
         return file_id
