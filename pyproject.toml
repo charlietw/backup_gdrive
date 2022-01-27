@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "backup_gdrive"
+version = "0.1.0"
+description = "Takes files from a filesystem, packages them up as a tar, sends to Google Drive, removes stale files. Deployable on Docker"
+authors = ["Charlie Wren"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+google-api-python-client = "^2.36.0"
+google-auth-httplib2 = "^0.1.0"
+google-auth-oauthlib = "^0.4.6"
+pytest = "^6.2.5"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
